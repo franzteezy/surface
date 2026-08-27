@@ -1,0 +1,173 @@
+version: '3.5'
+
+networks:
+  app-network:
+    driver: bridge
+
+services:
+  #-----------------------------------DATABASE-----------------------------------#
+  mariadb:
+    image: mariadb:10.7
+    volumes:
+      - ./data/:/docker-entrypoint-initdb.d/
+    environment:
+      - MYSQL_ROOT_PASSWORD=secret
+      - MYSQL_PASSWORD=secret
+      - MYSQL_USER=lumen
+      - MYSQL_DATABASE=shared
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.mariadb.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.mariadb.entrypoints=mariadb"
+      - "traefik.tcp.routers.mariadb.service=mariadb-svc"
+      - "traefik.tcp.services.mariadb-svc.loadbalancer.server.port=3306"
+    networks:
+      - app-network
+    healthcheck:
+      test: 'mysql --version'
+      timeout: 20s
+      retries: 10
+  #-----------------------------------REVERSE PROXY-----------------------------------#
+  traefik:
+    image: "traefik:v2.7"
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.mariadb.address=:3306"
+      - "--entrypoints.websocket.address=:3000"
+      - "--log.level=DEBUG"
+    ports:
+      - 80:80
+      - 8080:8080
+      - 443:443
+      - 3306:3306
+      - 3000:3000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - app-network
+  #-------------------------------------UI-------------------------------------#
+  ui:
+    volumes:
+      - ../../ui:/usr/share/nginx/html
+    build: ../../ui
+    restart: always
+    #----TRÆFIK PROXY----#
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ui.priority=21"
+      - "traefik.http.routers.ui.rule=HostRegexp(`{sub:[a-zA-Z0-9-]+}.stafflify.test`)"
+      - "traefik.http.routers.ui.entrypoints=web"
+      - "traefik.http.routers.ui.entrypoints=websecure"
+      - "traefik.http.routers.ui.tls=true"
+    networks:
+      - app-network
+
+  #-------------------------------------CDN-------------------------------------#
+  cdn:
+    volumes:
+      - ../../cdn:/usr/share/nginx/html
+    build: ../../cdn
+    #----TRÆFIK PROXY----#
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cdn.priority=42"
+      - "traefik.http.routers.cdn.rule=HostRegexp(`cdn.stafflify.test`)"
+      - "traefik.http.routers.cdn.entrypoints=web"
+      - "traefik.http.routers.cdn.entrypoints=websecure"
+      - "traefik.http.routers.cdn.tls=true"
+    networks:
+      - app-network
+    restart: always
+    depends_on:
+      - mariadb
+#-------------------------------------AUTHORIZE-------------------------------------#
+  authorize:
+    volumes:
+      - ../../services/core/authorize:/usr/share/nginx/html
+      - /usr/share/nginx/html/vendor/
+    build: ../../services/core/authorize
+    restart: always
+    #----TRÆFIK PROXY----#
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.authorize.priority=42"
+      - "traefik.http.routers.authorize.rule=HostRegexp(`authorize.stafflify.test`)"
+      - "traefik.http.routers.authorize.entrypoints=web"
+      - "traefik.http.routers.authorize.entrypoints=websecure"
+      - "traefik.http.routers.authorize.tls=true"
+    networks:
+      - app-network
+    depends_on:
+      - mariadb
+#-------------------------------------MAILER-------------------------------------#
+  mailer:
+    volumes:
+      - ../../services/core/mailer:/usr/share/nginx/html
+      - /usr/share/nginx/html/vendor/
+    build: ../../services/core/mailer
+    restart: always
+    #----TRÆFIK PROXY----#
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mailer.priority=42"
+      - "traefik.http.routers.mailer.rule=HostRegexp(`mailer.stafflify.test`)"
+      - "traefik.http.routers.mailer.entrypoints=web"
+      - "traefik.http.routers.mailer.entrypoints=websecure"
+      - "traefik.http.routers.mailer.tls=true"
+    networks:
+      - app-network
+    depends_on:
+      - mariadb
+#-------------------------------------REGISTER-------------------------------------#
+  register:
+    volumes:
+      - ../../services/core/register:/usr/share/nginx/html
+      - /usr/share/nginx/html/vendor/
+    build: ../../services/core/register
+    restart: always
+    #----TRÆFIK PROXY----#
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.register.priority=42"
+      - "traefik.http.routers.register.rule=HostRegexp(`register.stafflify.test`)"
+      - "traefik.http.routers.register.entrypoints=web"
+      - "traefik.http.routers.register.entrypoints=websecure"
+      - "traefik.http.routers.register.tls=true"
+    networks:
+      - app-network
+    depends_on:
+      - mariadb
+#-------------------------------------CHAT-------------------------------------#
+  chat:
+    volumes:
+      - ../../services/core/chat:/usr/share/nginx/html
+      - /usr/share/nginx/html/vendor/
+    build: ../../services/core/chat
+    restart: always
+    #----TRÆFIK PROXY----#
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.chat.priority=42"
+      - "traefik.http.routers.chat.rule=HostRegexp(`chat.stafflify.test`)"
+      - "traefik.http.routers.chat.entrypoints=web"
+      - "traefik.http.routers.chat.entrypoints=websecure"
+      - "traefik.http.routers.chat.service=chat-stafflify"
+      - "traefik.http.services.chat-stafflify.loadbalancer.server.port=80"
+      - "traefik.http.routers.chat.tls=true"
+      #WebSocket
+      - "traefik.http.routers.chat-ws.priority=42"
+      - "traefik.http.routers.chat-ws.rule=HostRegexp(`chat.stafflify.test`)"
+      - "traefik.http.routers.chat-ws.entrypoints=websocket"
+      - "traefik.http.routers.chat-ws.service=chat-ws-svc"
+      - "traefik.http.services.chat-ws-svc.loadbalancer.server.port=3000"
+      - "traefik.http.routers.chat-ws.tls=true"
+    networks:
+      - app-network
+    depends_on:
+      - mariadb

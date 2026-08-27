@@ -1,0 +1,52 @@
+diff --git a/node_modules/vue-file-toolbar-menu/src/Bar/BarButtonGeneric.vue b/node_modules/vue-file-toolbar-menu/src/Bar/BarButtonGeneric.vue
+index bde93ee..35bc25e 100644
+--- a/node_modules/vue-file-toolbar-menu/src/Bar/BarButtonGeneric.vue
++++ b/node_modules/vue-file-toolbar-menu/src/Bar/BarButtonGeneric.vue
+@@ -3,7 +3,7 @@
+     @mousedown="(e) => e.preventDefault()"
+     @click="(e) => (item.click && !item.disabled) ? item.click(e) : e.stopPropagation()">
+     
+-    <span v-if="item.icon" class="material-icons icon">{{ item.icon }}</span>
++    <span v-if="item.icon" class="material-icons icon"><i :class="{icon:true, ['icon-' + item.icon]:true}"/></span>
+     <span v-if="item.emoji" class="emoji">{{ get_emoji(item.emoji) }}</span>
+     <span v-if="item.text" class="label">{{ item.text }}</span>
+     <span v-if="item.html" class="label" v-html="item.html"></span>
+diff --git a/node_modules/vue-file-toolbar-menu/src/Bar/BarMenuItem.vue b/node_modules/vue-file-toolbar-menu/src/Bar/BarMenuItem.vue
+index 0194323..7891d6c 100644
+--- a/node_modules/vue-file-toolbar-menu/src/Bar/BarMenuItem.vue
++++ b/node_modules/vue-file-toolbar-menu/src/Bar/BarMenuItem.vue
+@@ -6,7 +6,7 @@
+     :title="item.title"
+     :style="{ height: item.height+'px' }">
+ 
+-    <span v-if="item.icon" class="material-icons icon">{{ item.icon }}</span>
++    <span v-if="item.icon" class="material-icons icon"><i :class="{icon:true, ['icon-' + item.icon]:true}"/></span>
+     <span v-if="item.emoji" class="emoji">{{ get_emoji(item.emoji) }}</span>
+     <span v-if="item.text" class="label">{{ item.text }}</span>
+     <span v-if="item.html" class="label" v-html="item.html"></span>
+@@ -47,7 +47,11 @@ export default {
+ 
+   methods: {
+     click (e) {
+-      if(this.item.click && !this.item.disabled) this.item.click(e);
++      if(this.item.click && !this.item.disabled)
++      { 
++        this.item.click(e);
++        console.log(this.item.click);
++      }
+       else if(!this.$refs.menu || !e.composedPath || !e.composedPath().includes(this.$refs.menu.$el)) {
+         e.stopPropagation(); // prevent menu close for touch devices
+       }
+diff --git a/node_modules/vue-file-toolbar-menu/src/Bar/imports/bar-default-styles.scss b/node_modules/vue-file-toolbar-menu/src/Bar/imports/bar-default-styles.scss
+index 597ed1c..3db852c 100644
+--- a/node_modules/vue-file-toolbar-menu/src/Bar/imports/bar-default-styles.scss
++++ b/node_modules/vue-file-toolbar-menu/src/Bar/imports/bar-default-styles.scss
+@@ -108,7 +108,7 @@
+   .bar-menu {
+     position: relative;
+     white-space: normal;
+-
++    top: 100% !important;
+     & > .extended-hover-zone {
+       position: absolute;
+       top: 0;
